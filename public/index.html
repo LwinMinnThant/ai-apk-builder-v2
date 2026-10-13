@@ -1,1 +1,47 @@
-
+<!doctype html>
+<html lang="my">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#101827">
+<title>AI APK Builder</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1220;--panel:#131e30;--line:#2b3a52;--text:#edf3ff;--muted:#aab8ce;--accent:#71e0c0}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px system-ui,-apple-system,"Noto Sans Myanmar",sans-serif}
+header{padding:22px 18px 16px;background:#101827;border-bottom:1px solid var(--line)}h1{font-size:24px;margin:0 0 7px}header p{margin:0;color:var(--muted);line-height:1.6}
+main{max-width:1100px;margin:auto;padding:16px;display:grid;gap:16px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px}
+label{display:block;font-weight:700;margin-bottom:9px}textarea{width:100%;min-height:150px;resize:vertical;background:#0a1322;color:var(--text);border:1px solid var(--line);border-radius:12px;padding:13px;font:inherit;line-height:1.55}
+.row{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}button{border:0;border-radius:11px;padding:12px 16px;font:inherit;font-weight:700;cursor:pointer;background:var(--accent);color:#071a18}button.secondary{background:#263750;color:var(--text);border:1px solid #3b4e6a}button.build{background:#ffd166;color:#251900}button:disabled{opacity:.55;cursor:wait}
+.status{color:var(--muted);font-size:14px;margin-top:10px;white-space:pre-wrap}iframe{width:100%;height:470px;background:white;border:1px solid var(--line);border-radius:12px}
+.small{font-size:13px;color:var(--muted);line-height:1.6}.notice{border-left:3px solid var(--accent);padding:9px 12px;background:#0d1928;color:var(--muted);line-height:1.6}
+@media(min-width:850px){main{grid-template-columns:1fr 1fr;align-items:start}.preview{grid-column:2;grid-row:1 / span 2}.prompt{grid-column:1}.help{grid-column:1}}
+</style>
+</head>
+<body>
+<header><h1>🤖 AI APK Builder</h1><p>Prompt → AI App → Preview → APK Build Request</p></header>
+<main>
+<section class="panel prompt">
+<label for="prompt">ကိုယ်ဖန်တီးချင်တဲ့ App အကြောင်း</label>
+<textarea id="prompt" placeholder="ဥပမာ - မြန်မာဘာသာနဲ့ မှတ်စုရေးတဲ့ App တစ်ခု ဖန်တီးပါ။ မှတ်စုအသစ်ထည့်၊ ပြင်၊ ဖျက်နိုင်ရမယ်။"></textarea>
+<div class="row"><button id="generate">✨ AI နဲ့ ဖန်တီးမယ်</button><button id="build" class="build">📦 APK Build လုပ်မယ်</button><button class="secondary" id="sample">နမူနာ Prompt</button></div>
+<div id="status" class="status">Server ကို စစ်ဆေးနေသည်…</div>
+<div id="buildresult" class="status"></div>
+</section>
+<section class="panel preview">
+<label>👁️ App Preview</label>
+<iframe id="preview" title="Generated app preview" sandbox="allow-forms allow-scripts"></iframe>
+<div class="row"><button id="download" class="secondary" disabled>HTML ဖိုင် Download</button><button id="reset" class="secondary">Preview ရှင်းမယ်</button></div>
+<p class="small">APK Build ခလုတ်သည် AI က HTML app ဖန်တီးပြီး GitHub Actions ထံ APK Build အလုပ်ကို ပို့ပေးသည်။ Build ပြီးမှ Actions ရဲ့ Artifacts မှ APK ကို Download လုပ်ပါ။</p>
+</section>
+<section class="panel help"><strong>အရေးကြီး</strong><p class="small">APK auto-build အတွက် backend ပေါ်မှာ Gemini API Key နဲ့ GitHub repo token/configuration ထည့်ထားဖို့ လိုပါတယ်။ ဒီ starter က AI ထုတ်ပေးတဲ့ HTML prototype ကို Android WebView app အဖြစ် package လုပ်ပေးတာဖြစ်ပြီး native Kotlin/Java app အားလုံးကို အလိုအလျောက်ပြောင်းပေးနိုင်တဲ့ universal compiler မဟုတ်သေးပါ။</p><div class="notice">API Key / GitHub Token ကို browser code ထဲ မထည့်ပါနှင့်။ Backend environment variables မှာသာ ထည့်ပါ။</div></section>
+</main>
+<script>
+const promptBox=document.getElementById('prompt'),statusBox=document.getElementById('status'),buildResult=document.getElementById('buildresult'),frame=document.getElementById('preview'),generateBtn=document.getElementById('generate'),buildBtn=document.getElementById('build'),downloadBtn=document.getElementById('download');
+let currentHtml='';
+async function checkHealth(){try{const r=await fetch('/api/health');const d=await r.json();statusBox.textContent=(d.aiConfigured?'AI API configured':'AI API key missing')+' · '+(d.buildConfigured?'APK build configured':'APK build configuration missing');}catch(e){statusBox.textContent='Backend ကို မချိတ်ဆက်နိုင်ပါ။ Server URL / deployment ကို စစ်ဆေးပါ။';}}
+generateBtn.addEventListener('click',async()=>{const prompt=promptBox.value.trim();if(!prompt){statusBox.textContent='App အကြောင်း Prompt အရင်ရေးပါ။';return;}generateBtn.disabled=true;statusBox.textContent='AI က App ကို ဖန်တီးနေပါတယ်…';buildResult.textContent='';try{const r=await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Generate failed');currentHtml=d.html;frame.srcdoc=currentHtml;downloadBtn.disabled=false;statusBox.textContent='Preview အဆင်သင့်ပါပြီ။ Model: '+d.model;}catch(e){statusBox.textContent='အမှား: '+e.message;}finally{generateBtn.disabled=false;}});
+buildBtn.addEventListener('click',async()=>{const prompt=promptBox.value.trim();if(!prompt){buildResult.textContent='APK Build မလုပ်ခင် App Prompt အရင်ရေးပါ။';return;}if(!confirm('AI က App ကိုဖန်တီးပြီး GitHub Actions မှာ APK Build စတင်ပါမယ်။ ဆက်လုပ်မလား?'))return;buildBtn.disabled=true;buildResult.textContent='AI က App ဖန်တီးပြီး Build Job ကို ပို့နေပါတယ်…';try{const r=await fetch('/api/build',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Build request failed');buildResult.textContent=d.message+' Model: '+d.model+' ';const a=document.createElement('a');a.href=d.actionsUrl;a.target='_blank';a.rel='noopener';a.textContent='GitHub Actions ကို ဖွင့်ရန်';a.style.color='#71e0c0';buildResult.appendChild(a);}catch(e){buildResult.textContent='APK Build အမှား: '+e.message;}finally{buildBtn.disabled=false;}});
+document.getElementById('sample').addEventListener('click',()=>{promptBox.value='မြန်မာဘာသာနဲ့ ရိုးရှင်းတဲ့ မှတ်စုရေး App တစ်ခု ဖန်တီးပါ။ မှတ်စုအသစ်ထည့်နိုင်ရမယ်၊ မှတ်စုတွေကို စာရင်းပြနိုင်ရမယ်၊ ဖျက်နိုင်ရမယ်။ Mobile-first design၊ dark blue background၊ accessible buttons သုံးပါ။';});
+document.getElementById('reset').addEventListener('click',()=>{currentHtml='';frame.srcdoc='';downloadBtn.disabled=true;statusBox.textContent='Preview ရှင်းပြီးပါပြီ။';});
+downloadBtn.addEventListener('click',()=>{if(!currentHtml)return;const blob=new Blob([currentHtml],{type:'text/html;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='generated-app.html';a.click();URL.revokeObjectURL(a.href);});
+checkHealth();
+</script>
+</body></html>
