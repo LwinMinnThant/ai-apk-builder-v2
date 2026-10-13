@@ -1,0 +1,6 @@
+{
+  "appId": "com.example.aiapkbuilder",
+  "appName": "AI APK Builder",
+  "webDir": "public",
+  "bundledWebRuntime": false
+}
