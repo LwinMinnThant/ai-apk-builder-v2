@@ -1,0 +1,64 @@
+name: Build Generated App APK
+on:
+  workflow_dispatch:
+    inputs:
+      app_prompt:
+        description: 'Short app description (for traceability)'
+        required: true
+        type: string
+      generated_html:
+        description: 'Generated standalone HTML document'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Prepare generated app
+        env:
+          GENERATED_HTML: ${{ inputs.generated_html }}
+        run: |
+          mkdir -p generated-app
+          node -e "const fs=require('fs'); const h=process.env.GENERATED_HTML||''; if(!h.toLowerCase().includes('<html') && !h.toLowerCase().includes('<!doctype html')) throw new Error('Invalid generated HTML'); fs.writeFileSync('generated-app/index.html',h,'utf8');"
+          cat > generated-app/package.json <<'EOF'
+          {"name":"generated-ai-app","version":"1.0.0","private":true}
+          EOF
+          cat > generated-app/capacitor.config.json <<'EOF'
+          {"appId":"com.generated.aiapp","appName":"AI Generated App","webDir":"www","bundledWebRuntime":false}
+          EOF
+          mkdir -p generated-app/www
+          cp generated-app/index.html generated-app/www/index.html
+      - name: Install Capacitor and create Android project
+        working-directory: generated-app
+        run: |
+          npm init -y
+          npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
+          npx cap add android
+          npx cap sync android
+      - name: Build debug APK
+        working-directory: generated-app/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+      - name: Upload generated APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-app-apk
+          path: generated-app/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
